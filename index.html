@@ -24,6 +24,7 @@
             <button onclick="filterSchedule('today')" id="btn-today" class="flex-1 py-2 text-sm font-semibold bg-white rounded-md shadow">Сегодня</button>
             <button onclick="filterSchedule('week')" id="btn-week" class="flex-1 py-2 text-sm font-semibold">На неделю</button>
         </div>
+        
         <div id="schedule-list" class="space-y-4">Загрузка...</div>
         
         <button onclick="changeGroup()" class="mt-10 w-full py-3 bg-red-100 text-red-600 font-bold rounded-xl border border-red-200 active:scale-95 transition-transform">
@@ -49,6 +50,15 @@
         const apiUrl = 'https://script.google.com/macros/s/AKfycbxN0lVaFLgCw3Ss4kjoaovMcrTQ27LGwWzwenjxGQEFnAlO7ZbGua2TojEWNjVParg/exec';
         let fullData = { schedule: [], teachers: [] };
         let userGroup = localStorage.getItem('userGroup');
+
+        // Функция определения недели
+        function getWeekType() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), 0, 1);
+            const days = Math.floor((now - start) / (24 * 60 * 60 * 1000));
+            const weekNumber = Math.ceil((now.getDay() + 1 + days) / 7);
+            return (weekNumber % 2 === 0) ? 'Четная' : 'Нечетная';
+        }
 
         async function init() {
             try {
@@ -85,18 +95,26 @@
 
             const list = document.getElementById('schedule-list');
             const today = new Date().toLocaleDateString('ru-RU', { weekday: 'long' });
-            
-            let data = fullData.schedule.filter(r => r['Группа'] === userGroup);
-            if (mode === 'today') {
-                data = data.filter(r => r['День недели']?.trim().toLowerCase() === today.toLowerCase());
-            }
+            const currentWeekType = getWeekType();
+
+            // Индикатор недели
+            const header = `<div class="text-center py-2 mb-2 bg-blue-100 rounded-lg text-blue-800 font-bold text-sm">
+                Текущая неделя: ${currentWeekType}
+            </div>`;
+
+            // Фильтр: Группа + (если today) День + Неделя
+            let data = fullData.schedule.filter(r => {
+                const matchGroup = r['Группа'] === userGroup;
+                const matchDay = mode === 'today' ? r['День недели']?.trim().toLowerCase() === today.toLowerCase() : true;
+                const matchWeek = (r['Неделя'] || '').trim() === "Любая" || (r['Неделя'] || '').trim() === currentWeekType;
+                return matchGroup && matchDay && matchWeek;
+            });
 
             if (data.length === 0) {
-                list.innerHTML = '<p class="text-center text-gray-400 mt-10">Пар нет!</p>';
+                list.innerHTML = header + '<p class="text-center text-gray-400 mt-10">Пар нет!</p>';
                 return;
             }
 
-            // Группировка
             const grouped = data.reduce((acc, curr) => {
                 const day = curr['День недели'];
                 if (!acc[day]) acc[day] = [];
@@ -104,7 +122,7 @@
                 return acc;
             }, {});
 
-            list.innerHTML = Object.keys(grouped).map(day => `
+            list.innerHTML = header + Object.keys(grouped).map(day => `
                 <div class="mt-4">
                     <h3 class="text-blue-900 font-bold mb-2 uppercase text-xs tracking-wider">${day}</h3>
                     ${grouped[day].map(r => `
