@@ -12,6 +12,7 @@
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .task-card { transition: all 0.2s ease; }
     </style>
 </head>
 <body class="font-sans text-gray-900">
@@ -86,12 +87,15 @@
             try {
                 const res = await fetch(apiUrl);
                 fullData = await res.json();
+                console.log("Данные получены:", fullData);
                 if (!userGroup) showSetup(); 
                 else {
                     document.getElementById('current-group-badge').innerText = userGroup;
                     filterSchedule('today');
+                    renderTeachers();
+                    renderTasks();
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error("Ошибка API:", e); }
         }
 
         function showSetup() {
@@ -111,8 +115,9 @@
             document.getElementById('tab-' + tab).classList.add('tab-active');
             ['nav-sch', 'nav-tas', 'nav-tea'].forEach(id => {
                 const el = document.getElementById(id);
-                el.classList.toggle('text-blue-600', id.includes(tab.substring(0,3)));
-                el.classList.toggle('text-gray-400', !id.includes(tab.substring(0,3)));
+                const isActive = id.includes(tab.substring(0,3));
+                el.classList.toggle('text-blue-600', isActive);
+                el.classList.toggle('text-gray-400', !isActive);
             });
             if (tab === 'teachers') renderTeachers();
             if (tab === 'tasks') renderTasks();
@@ -130,7 +135,7 @@
             const currentWeekType = getWeekType();
 
             document.getElementById('week-indicator-container').innerHTML = `
-                <div class="inline-block px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full font-black text-[10px] uppercase tracking-widest leading-none border border-blue-100">
+                <div class="inline-block px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full font-black text-[10px] uppercase tracking-widest border border-blue-100">
                     Текущая неделя: ${currentWeekType}
                 </div>`;
 
@@ -142,7 +147,7 @@
             });
 
             if (!data.length) { 
-                list.innerHTML = `<div class="mt-10 py-10 text-gray-400 font-bold">Пар нет! ✨</div>`; 
+                list.innerHTML = `<div class="mt-10 py-10 text-gray-400 font-bold">На этот период пар нет! ✨</div>`; 
                 return; 
             }
 
@@ -175,7 +180,8 @@
 
         window.renderTasks = () => {
             const container = document.getElementById('tasks-list');
-            if (!fullData.tasks?.length) {
+            const tasksData = fullData.tasks || fullData.Tasks || [];
+            if (!tasksData.length) {
                 container.innerHTML = `<div class="py-20 text-center text-gray-400 font-bold">Заданий нет 🎉</div>`;
                 return;
             }
@@ -183,7 +189,7 @@
             const now = new Date();
             now.setHours(0, 0, 0, 0);
 
-            container.innerHTML = fullData.tasks.map(t => {
+            container.innerHTML = tasksData.map(t => {
                 const rawDate = t['Срок'];
                 let dDate = null;
 
@@ -206,9 +212,7 @@
                     <p class="text-[10px] font-black ${isPast ? 'text-gray-400' : 'text-blue-500'} uppercase tracking-widest leading-none mb-1">
                         ${t['Предмет'] || 'ОБЩЕЕ'}
                     </p>
-                    <p class="font-bold text-gray-800 leading-snug pr-24 text-lg">
-                        ${t['Задание']}
-                    </p>
+                    <p class="font-bold text-gray-800 leading-snug pr-24 text-lg">${t['Задание']}</p>
                     ${!isPast ? `
                         <div class="mt-2 flex items-center gap-1.5">
                             <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -220,26 +224,29 @@
 
         window.renderTeachers = () => {
             const container = document.getElementById('teachers-list');
-            if (!fullData.teachers?.length) {
-                container.innerHTML = '<p class="text-center py-10 text-gray-400 font-bold">Список преподавателей пуст</p>';
+            const tData = fullData.teachers || fullData.Teachers || [];
+            
+            if (!tData.length) {
+                container.innerHTML = '<div class="text-center py-10 text-gray-400 font-bold">Список пуст 📭</div>';
                 return;
             }
 
-            container.innerHTML = fullData.teachers.map(t => {
-                // Фильтруем служебные поля и пустые значения
+            container.innerHTML = tData.map(t => {
+                const name = t['ФИО'] || t['фио'] || 'Без имени';
+                const dept = t['Кафедра'] || t['кафедра'] || '';
+                const photo = t['Фото (Ссылка)'] || t['Фото'] || t['фото'] || '';
                 const infoEntries = Object.entries(t).filter(([k, v]) => 
-                    !['ФИО', 'Кафедра', 'Фото (Ссылка)', 'Фото'].includes(k) && v
+                    !['ФИО', 'Кафедра', 'Фото (Ссылка)', 'Фото', 'фио', 'кафедра', 'фото'].includes(k) && v
                 );
 
                 return `
                 <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex gap-5 items-start mb-4 fade-in">
-                    <img src="${t['Фото (Ссылка)'] || t['Фото'] || ''}" 
+                    <img src="${photo}" 
                          class="w-20 h-20 rounded-2xl object-cover bg-gray-50 shadow-inner flex-shrink-0"
-                         onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(t['ФИО'])}&background=random&size=128'">
+                         onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&size=128'">
                     <div class="flex-1 min-w-0">
-                        <p class="font-black text-gray-900 leading-tight text-lg mb-0.5">${t['ФИО']}</p>
-                        <p class="text-xs font-bold text-blue-500 uppercase tracking-wider mb-3">${t['Кафедра']}</p>
-                        
+                        <p class="font-black text-gray-900 leading-tight text-lg mb-0.5">${name}</p>
+                        <p class="text-xs font-bold text-blue-500 uppercase tracking-wider mb-3">${dept}</p>
                         <div class="space-y-3 border-t border-gray-50 pt-3">
                             ${infoEntries.map(([key, val]) => `
                                 <div>
