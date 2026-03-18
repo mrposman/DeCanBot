@@ -12,7 +12,6 @@
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .task-card { transition: all 0.2s ease; }
     </style>
 </head>
 <body class="font-sans text-gray-900">
@@ -71,7 +70,9 @@
     </nav>
 
     <script>
-        const apiUrl = 'https://script.google.com/macros/s/AKfycbwoneeiEyqWVJYdNWPnyekpeZ23BLR8YLP4M-Ixno9xeewY7FR38RbE6-VW6wzGmikJ/exec';
+        // ТВОЯ НОВАЯ ССЫЛКА НА API
+        const apiUrl = 'https://script.google.com/macros/s/AKfycbwFYqlirSD30fG2vMIWPF4ax1qiXVajbZu5YddB_9oljmbJwGKaR9wTtsrw8tTcP2SI/exec';
+        
         let fullData = { schedule: [], teachers: [], tasks: [] };
         let userGroup = localStorage.getItem('userGroup');
 
@@ -87,15 +88,20 @@
             try {
                 const res = await fetch(apiUrl);
                 fullData = await res.json();
-                console.log("Данные получены:", fullData);
-                if (!userGroup) showSetup(); 
-                else {
+                console.log("Данные успешно загружены:", fullData);
+                
+                if (!userGroup) {
+                    showSetup(); 
+                } else {
                     document.getElementById('current-group-badge').innerText = userGroup;
                     filterSchedule('today');
                     renderTeachers();
                     renderTasks();
                 }
-            } catch (e) { console.error("Ошибка API:", e); }
+            } catch (e) { 
+                console.error("Ошибка при получении данных:", e); 
+                document.getElementById('schedule-list').innerHTML = "Ошибка загрузки данных. Проверьте соединение.";
+            }
         }
 
         function showSetup() {
@@ -107,8 +113,16 @@
             `).join('');
         }
 
-        window.saveGroup = (g) => { localStorage.setItem('userGroup', g); userGroup = g; location.reload(); }
-        window.changeGroup = () => { localStorage.removeItem('userGroup'); location.reload(); }
+        window.saveGroup = (g) => { 
+            localStorage.setItem('userGroup', g); 
+            userGroup = g; 
+            location.reload(); 
+        }
+
+        window.changeGroup = () => { 
+            localStorage.removeItem('userGroup'); 
+            location.reload(); 
+        }
 
         window.switchMainTab = (tab) => {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('tab-active'));
@@ -180,7 +194,7 @@
 
         window.renderTasks = () => {
             const container = document.getElementById('tasks-list');
-            const tasksData = fullData.tasks || fullData.Tasks || [];
+            const tasksData = fullData.tasks || [];
             if (!tasksData.length) {
                 container.innerHTML = `<div class="py-20 text-center text-gray-400 font-bold">Заданий нет 🎉</div>`;
                 return;
@@ -193,15 +207,12 @@
                 const rawDate = t['Срок'];
                 let dDate = null;
 
-                if (rawDate instanceof Date || !isNaN(Date.parse(rawDate))) {
+                if (rawDate && (rawDate instanceof Date || !isNaN(Date.parse(rawDate)))) {
                     dDate = new Date(rawDate);
-                } else if (typeof rawDate === 'string' && rawDate.includes('.')) {
-                    const p = rawDate.split('.');
-                    dDate = new Date(p[2], p[1] - 1, p[0]);
                 }
 
                 const isPast = dDate && dDate < now;
-                const dateDisplay = dDate ? dDate.toLocaleDateString('ru-RU') : rawDate;
+                const dateDisplay = dDate ? dDate.toLocaleDateString('ru-RU') : (rawDate || '—');
 
                 return `
                 <div class="bg-white p-5 rounded-3xl border ${isPast ? 'border-gray-100 opacity-60' : 'border-blue-50 shadow-sm'} text-left flex flex-col gap-1 relative overflow-hidden mb-4">
@@ -224,10 +235,10 @@
 
         window.renderTeachers = () => {
             const container = document.getElementById('teachers-list');
-            const tData = fullData.teachers || fullData.Teachers || [];
+            const tData = fullData.teachers || [];
             
             if (!tData.length) {
-                container.innerHTML = '<div class="text-center py-10 text-gray-400 font-bold">Список пуст 📭</div>';
+                container.innerHTML = '<div class="text-center py-10 text-gray-400 font-bold">Список преподавателей пуст 📭</div>';
                 return;
             }
 
@@ -235,6 +246,8 @@
                 const name = t['ФИО'] || t['фио'] || 'Без имени';
                 const dept = t['Кафедра'] || t['кафедра'] || '';
                 const photo = t['Фото (Ссылка)'] || t['Фото'] || t['фото'] || '';
+                
+                // Фильтруем все остальные поля для отображения в "деталях"
                 const infoEntries = Object.entries(t).filter(([k, v]) => 
                     !['ФИО', 'Кафедра', 'Фото (Ссылка)', 'Фото', 'фио', 'кафедра', 'фото'].includes(k) && v
                 );
