@@ -12,8 +12,6 @@
         ::-webkit-scrollbar { width: 0px; background: transparent; }
         .fade-in { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .task-card { transition: all 0.2s ease; }
-        .task-card:active { transform: scale(0.98); }
     </style>
 </head>
 <body class="font-sans text-gray-900">
@@ -32,11 +30,11 @@
             <span id="current-group-badge" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black uppercase tracking-widest"></span>
         </header>
 
-        <div id="week-indicator-container" class="mb-4"></div>
+        <div id="week-indicator-container" class="mb-4 text-center"></div>
 
         <div class="flex bg-gray-200/50 p-1 rounded-2xl mb-6">
-            <button onclick="filterSchedule('today')" id="btn-today" class="flex-1 py-3 text-sm font-bold transition-all rounded-xl bg-white shadow-sm text-blue-600">Сегодня</button>
-            <button onclick="filterSchedule('week')" id="btn-week" class="flex-1 py-3 text-sm font-bold transition-all text-gray-500">На неделю</button>
+            <button onclick="filterSchedule('today')" id="btn-today" class="flex-1 py-3 text-sm font-bold transition-all rounded-xl">Сегодня</button>
+            <button onclick="filterSchedule('week')" id="btn-week" class="flex-1 py-3 text-sm font-bold transition-all rounded-xl">На неделю</button>
         </div>
         
         <div id="schedule-list" class="space-y-4 py-4 text-center text-gray-400 font-medium">Загрузка данных...</div>
@@ -92,8 +90,6 @@
                 else {
                     document.getElementById('current-group-badge').innerText = userGroup;
                     filterSchedule('today');
-                    renderTasks(); 
-                    renderTeachers();
                 }
             } catch (e) { console.error(e); }
         }
@@ -107,20 +103,17 @@
             `).join('');
         }
 
-        window.saveGroup = (g) => { localStorage.setItem('userGroup', g); location.reload(); }
+        window.saveGroup = (g) => { localStorage.setItem('userGroup', g); userGroup = g; location.reload(); }
         window.changeGroup = () => { localStorage.removeItem('userGroup'); location.reload(); }
 
         window.switchMainTab = (tab) => {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('tab-active'));
             document.getElementById('tab-' + tab).classList.add('tab-active');
-            
-            const btnMap = { 'schedule': 'nav-sch', 'tasks': 'nav-tas', 'teachers': 'nav-tea' };
-            Object.keys(btnMap).forEach(k => {
-                const el = document.getElementById(btnMap[k]);
-                el.classList.toggle('text-blue-600', k === tab);
-                el.classList.toggle('text-gray-400', k !== tab);
+            ['nav-sch', 'nav-tas', 'nav-tea'].forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.toggle('text-blue-600', id.includes(tab.substring(0,3)));
+                el.classList.toggle('text-gray-400', !id.includes(tab.substring(0,3)));
             });
-            
             if (tab === 'teachers') renderTeachers();
             if (tab === 'tasks') renderTasks();
             if (tab === 'schedule') filterSchedule('today');
@@ -138,7 +131,7 @@
 
             document.getElementById('week-indicator-container').innerHTML = `
                 <div class="inline-block px-4 py-1.5 bg-blue-50 text-blue-600 rounded-full font-black text-[10px] uppercase tracking-widest leading-none border border-blue-100">
-                    ${currentWeekType} неделя
+                    Текущая неделя: ${currentWeekType}
                 </div>`;
 
             let data = fullData.schedule.filter(r => {
@@ -149,7 +142,7 @@
             });
 
             if (!data.length) { 
-                list.innerHTML = `<div class="mt-10 py-10"><p class="text-4xl mb-4 text-gray-200">✨</p><p class="text-gray-400 font-bold">На сегодня пар нет!</p></div>`; 
+                list.innerHTML = `<div class="mt-10 py-10 text-gray-400 font-bold">Пар нет! ✨</div>`; 
                 return; 
             }
 
@@ -205,7 +198,7 @@
                 const dateDisplay = dDate ? dDate.toLocaleDateString('ru-RU') : rawDate;
 
                 return `
-                <div class="task-card bg-white p-5 rounded-3xl border ${isPast ? 'border-gray-100 opacity-60' : 'border-blue-50 shadow-sm'} text-left flex flex-col gap-1 relative overflow-hidden mb-4">
+                <div class="bg-white p-5 rounded-3xl border ${isPast ? 'border-gray-100 opacity-60' : 'border-blue-50 shadow-sm'} text-left flex flex-col gap-1 relative overflow-hidden mb-4">
                     <div class="absolute top-0 right-0 px-4 py-2 ${isPast ? 'bg-gray-100 text-gray-500' : 'bg-orange-50 text-orange-600'} text-center min-w-[100px] border-l border-b border-gray-50">
                         <p class="text-[9px] font-black uppercase leading-none mb-1">${isPast ? 'Прошло' : 'Дедлайн'}</p>
                         <p class="text-sm font-black leading-none">${dateDisplay}</p>
@@ -228,19 +221,32 @@
         window.renderTeachers = () => {
             const container = document.getElementById('teachers-list');
             if (!fullData.teachers?.length) {
-                container.innerHTML = '<p class="text-center py-10 text-gray-400">Список пуст</p>';
+                container.innerHTML = '<p class="text-center py-10 text-gray-400 font-bold">Список преподавателей пуст</p>';
                 return;
             }
+
             container.innerHTML = fullData.teachers.map(t => {
-                const info = Object.entries(t).filter(([k]) => !['ФИО','Кафедра','Фото (Ссылка)','Фото'].includes(k) && t[k]);
+                // Фильтруем служебные поля и пустые значения
+                const infoEntries = Object.entries(t).filter(([k, v]) => 
+                    !['ФИО', 'Кафедра', 'Фото (Ссылка)', 'Фото'].includes(k) && v
+                );
+
                 return `
-                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex gap-5 items-start mb-4">
-                    <img src="${t['Фото (Ссылка)'] || t['Фото'] || ''}" class="w-20 h-20 rounded-2xl object-cover bg-gray-50 shadow-inner flex-shrink-0" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(t['ФИО'])}&background=random'">
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex gap-5 items-start mb-4 fade-in">
+                    <img src="${t['Фото (Ссылка)'] || t['Фото'] || ''}" 
+                         class="w-20 h-20 rounded-2xl object-cover bg-gray-50 shadow-inner flex-shrink-0"
+                         onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(t['ФИО'])}&background=random&size=128'">
                     <div class="flex-1 min-w-0">
                         <p class="font-black text-gray-900 leading-tight text-lg mb-0.5">${t['ФИО']}</p>
-                        <p class="text-xs font-bold text-blue-500 uppercase tracking-wider mb-2">${t['Кафедра']}</p>
-                        <div class="space-y-1">
-                            ${info.map(([k,v]) => `<p class="text-[11px] text-gray-600"><b>${k}:</b> ${v}</p>`).join('')}
+                        <p class="text-xs font-bold text-blue-500 uppercase tracking-wider mb-3">${t['Кафедра']}</p>
+                        
+                        <div class="space-y-3 border-t border-gray-50 pt-3">
+                            ${infoEntries.map(([key, val]) => `
+                                <div>
+                                    <p class="text-[9px] font-black text-gray-400 uppercase tracking-tight mb-0.5 leading-none">${key}</p>
+                                    <p class="text-[13px] text-gray-700 font-semibold leading-tight">${val}</p>
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
                 </div>`;
